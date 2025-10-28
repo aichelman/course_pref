@@ -1,0 +1,237 @@
+import os
+import csv
+import random
+import requests
+from dotenv import load_dotenv
+from flask import Flask, render_template, jsonify, request, redirect, url_for
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+
+load_dotenv()
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///courses.db'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+db = SQLAlchemy(app)
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+with app.app_context():
+    db.create_all()
+
+CSV_FILE = 'courses.csv'
+
+class User(UserMixin, db.Model):
+    __tablename__ = 'user'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+class Course(db.Model):
+    __tablename__ = 'course'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    user = db.relationship('User', backref='courses')
+
+class Rating(db.Model):
+    __tablename__ = 'rating'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'))
+    rating = db.Column(db.Float, default=1200)
+
+    user = db.relationship('User', backref='ratings')
+    course = db.relationship('Course', backref='ratings')
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+with app.app_context():
+    db.create_all()
+
+@app.route('/')
+@login_required
+def index():
+    return render_template('index.html', username=current_user.username)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        username = request.json.get('username')
+        password = request.json.get('password')
+        user = User.query.filter_by(username=username).first()
+
+        if user and user.check_password(password):
+            login_user(user)
+            return jsonify({"status": "success"})
+        return jsonify({"status": "error", "message": "Invalid username or password"}), 401
+
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        username = request.json.get('username')
+        password = request.json.get('password')
+
+        if User.query.filter_by(username=username).first():
+            return jsonify({"status": "error", "message": "Username already exists"}), 400
+
+        user = User(username=username)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+
+        login_user(user)
+        return jsonify({"status": "success"})
+
+    return render_template('register.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+@app.route('/pair')
+@login_required
+def pair():
+    user_courses = Course.query.filter_by(user_id=current_user.id).all()
+    if len(user_courses) < 2:
+        return jsonify({"error": "Need at least 2 courses to compare"}), 400
+
+    courses = random.sample(user_courses, 2)
+    return jsonify({"course1": courses[0].name, "course2": courses[1].name})
+
+@app.route('/vote', methods=['POST'])
+@login_required
+def vote():
+    data = request.json
+    winner = data['winner']
+    loser = data['loser']
+    update_ratings(current_user, winner, loser)
+    return jsonify({"status": "success"})
+
+@app.route('/rankings')
+@login_required
+def rankings():
+    ratings = Rating.query.filter_by(user_id=current_user.id).join(Course).order_by(Rating.rating.desc()).all()
+    ranked = [{"name": r.course.name, "rating": round(r.rating)} for r in ratings]
+    return jsonify(ranked)
+
+@app.route('/search_courses', methods=['GET'])
+@login_required
+def search_courses():
+    query = request.args.get('query')
+    url = "https://nominatim.openstreetmap.org/search"
+    params = {"q": f"{query} golf", "format": "json", "limit": 10}
+    headers = {"User-Agent": "GolfCourseRankerApp"}
+    response = requests.get(url, params=params, headers=headers).json()
+
+    results = []
+    for res in response:
+        display_name = res["display_name"]
+        name = display_name.split(",")[0]
+        address = ", ".join(display_name.split(",")[1:]).strip()
+        results.append({"name": name, "address": address})
+
+    return jsonify(results)
+
+@app.route('/add_course', methods=['POST'])
+@login_required
+def add_course():
+    course_name = request.json['name']
+
+    # Check if user already has this course
+    existing_course = Course.query.filter_by(name=course_name, user_id=current_user.id).first()
+    if existing_course:
+        return jsonify({"status": "already_exists", "course": course_name}), 400
+
+    # Add course to database
+    new_course = Course(name=course_name, user_id=current_user.id)
+    db.session.add(new_course)
+    db.session.commit()
+
+    # Create rating entry for this course
+    rating = Rating(user_id=current_user.id, course_id=new_course.id, rating=1200)
+    db.session.add(rating)
+    db.session.commit()
+
+    return jsonify({"status": "added", "course": course_name})
+
+@app.route('/upload_csv', methods=['POST'])
+@login_required
+def upload_csv():
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "No file provided"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"status": "error", "message": "No file selected"}), 400
+
+    if not file.filename.endswith('.csv'):
+        return jsonify({"status": "error", "message": "File must be a CSV"}), 400
+
+    # Read CSV file
+    stream = file.stream.read().decode("utf-8")
+    csv_input = csv.reader(stream.splitlines())
+
+    added_count = 0
+    for row in csv_input:
+        if not row or not row[0].strip():
+            continue
+
+        course_name = row[0].strip()
+
+        # Check if user already has this course
+        existing_course = Course.query.filter_by(name=course_name, user_id=current_user.id).first()
+        if not existing_course:
+            new_course = Course(name=course_name, user_id=current_user.id)
+            db.session.add(new_course)
+            db.session.commit()
+
+            # Create rating entry
+            rating = Rating(user_id=current_user.id, course_id=new_course.id, rating=1200)
+            db.session.add(rating)
+            added_count += 1
+
+    db.session.commit()
+    return jsonify({"status": "success", "added": added_count})
+
+def update_ratings(user, winner_name, loser_name, k=32):
+    winner_course = Course.query.filter_by(name=winner_name, user_id=user.id).first()
+    loser_course = Course.query.filter_by(name=loser_name, user_id=user.id).first()
+
+    winner_rating = Rating.query.filter_by(user_id=user.id, course_id=winner_course.id).first()
+    loser_rating = Rating.query.filter_by(user_id=user.id, course_id=loser_course.id).first()
+
+    E_winner = 1 / (1 + 10 ** ((loser_rating.rating - winner_rating.rating) / 400))
+    E_loser = 1 - E_winner
+
+    winner_rating.rating += k * (1 - E_winner)
+    loser_rating.rating += k * (0 - E_loser)
+
+    db.session.commit()
+
+
+if __name__ == '__main__':
+    # Use environment variable to determine if we're in production
+    debug_mode = os.environ.get('FLASK_ENV') != 'production'
+    app.run(debug=debug_mode, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
