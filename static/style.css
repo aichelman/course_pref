@@ -18,6 +18,62 @@ body {
     background: linear-gradient(135deg, var(--sky-blue) 0%, var(--fairway-green) 100%);
     min-height: 100vh;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    position: relative;
+}
+
+/* Background Slideshow */
+.background-slideshow {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    overflow: hidden;
+}
+
+.background-slideshow::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1;
+}
+
+.slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 2s ease-in-out;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.slide.active {
+    opacity: 1;
+}
+
+.slide1 {
+    background-image: url('/static/images/golf1.jpeg');
+}
+
+.slide2 {
+    background-image: url('/static/images/golf2.jpeg');
+}
+
+.slide3 {
+    background-image: url('/static/images/golf3.jpeg');
+}
+
+.slide4 {
+    background-image: url('/static/images/golf4.jpeg');
 }
 
 /* Navbar Styling */
