@@ -3,33 +3,35 @@
 <head>
     <title>Register - Golf Course Rankings</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/style.css" rel="stylesheet">
 </head>
-<body class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card shadow">
-                <div class="card-body">
-                    <h2 class="text-center mb-4">Register</h2>
-                    <form id="registerForm">
-                        <div class="mb-3">
-                            <label for="username" class="form-label">Username</label>
-                            <input type="text" class="form-control" id="username" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Password</label>
-                            <input type="password" class="form-control" id="password" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="confirmPassword" class="form-label">Confirm Password</label>
-                            <input type="password" class="form-control" id="confirmPassword" required>
-                        </div>
-                        <div id="errorMessage" class="alert alert-danger d-none"></div>
-                        <button type="submit" class="btn btn-primary w-100">Register</button>
-                    </form>
-                    <div class="text-center mt-3">
-                        <p>Already have an account? <a href="/login">Login here</a></p>
-                    </div>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="text-center mb-4">
+                <h1 class="auth-title">⛳ Golf Ranker</h1>
+                <p class="auth-subtitle">Create your account to start ranking</p>
+            </div>
+
+            <form id="registerForm">
+                <div class="mb-4">
+                    <label for="username" class="form-label-modern">Username</label>
+                    <input type="text" class="form-control form-control-modern" id="username" placeholder="Choose a username" required>
                 </div>
+                <div class="mb-4">
+                    <label for="password" class="form-label-modern">Password</label>
+                    <input type="password" class="form-control form-control-modern" id="password" placeholder="Create a password" required>
+                </div>
+                <div class="mb-4">
+                    <label for="confirmPassword" class="form-label-modern">Confirm Password</label>
+                    <input type="password" class="form-control form-control-modern" id="confirmPassword" placeholder="Confirm your password" required>
+                </div>
+                <div id="errorMessage" class="alert alert-danger-modern alert-modern d-none"></div>
+                <button type="submit" class="btn btn-golf-primary w-100 mb-3">Create Account</button>
+            </form>
+
+            <div class="text-center">
+                <p class="mb-0">Already have an account? <a href="/login" class="link-custom">Login here</a></p>
             </div>
         </div>
     </div>

@@ -3,60 +3,70 @@
 <head>
     <title>Golf Course Rankings</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/style.css" rel="stylesheet">
 </head>
-<body class="container py-5">
+<body>
+    <div class="container py-4">
+        <nav class="navbar navbar-custom mb-4">
+            <div class="container-fluid">
+                <span class="navbar-brand">⛳ Welcome, {{ username }}!</span>
+                <a href="/logout" class="btn btn-logout">Logout</a>
+            </div>
+        </nav>
 
-    <nav class="navbar navbar-light bg-light mb-4 rounded">
-        <div class="container-fluid">
-            <span class="navbar-brand">Welcome, {{ username }}!</span>
-            <a href="/logout" class="btn btn-outline-danger">Logout</a>
-        </div>
-    </nav>
-
-    <h1 class="text-center">Golf Course Ranking</h1>
+        <h1 class="page-title text-center">Golf Course Ranking</h1>
 
     <div class="row mt-5">
 
         <!-- Pairwise Voting Section -->
-        <div class="col-md-6">
-            <h3 class="mb-4">Choose Your Favorite</h3>
-            <div id="courses" class="d-flex justify-content-around mb-3">
-                <button id="course1" class="btn btn-primary w-50 mx-1"></button>
-                <button id="course2" class="btn btn-success w-50 mx-1"></button>
-            </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card-modern">
+                <div class="card-header-custom">
+                    Choose Your Favorite
+                </div>
+                <div id="courses" class="d-flex gap-3 mb-4">
+                    <button id="course1" class="btn course-btn course-btn-1 w-50"></button>
+                    <button id="course2" class="btn course-btn course-btn-2 w-50"></button>
+                </div>
 
-            <!-- Ranking List Section -->
-            <h4 class="mt-4">Current Rankings:</h4>
-            <ul id="rankings" class="list-group"></ul>
+                <!-- Ranking List Section -->
+                <h4 class="mt-5 mb-3" style="color: var(--golf-green); font-weight: 700;">
+                    <span style="font-size: 1.5rem;">🏆</span> Your Rankings
+                </h4>
+                <ul id="rankings" class="list-group rankings-list"></ul>
+            </div>
         </div>
 
         <!-- Search & Add Course Section -->
-        <div class="col-md-6">
-            <h3>Add Golf Courses</h3>
-
+        <div class="col-lg-6 mb-4">
             <!-- CSV Upload -->
-            <div class="card mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">Upload CSV File</h5>
-                    <input type="file" id="csvFile" class="form-control mb-2" accept=".csv">
-                    <button class="btn btn-primary w-100" onclick="uploadCSV()">Upload CSV</button>
-                    <small class="text-muted d-block mt-2">CSV format: One course name per line</small>
+            <div class="card-modern mb-4">
+                <div class="card-header-custom">
+                    📤 Upload CSV File
                 </div>
+                <div class="file-upload-wrapper">
+                    <input type="file" id="csvFile" class="form-control file-upload-input mb-3" accept=".csv">
+                </div>
+                <button class="btn btn-golf-primary w-100" onclick="uploadCSV()">Upload Courses</button>
+                <small class="text-muted d-block mt-3 text-center">
+                    <strong>CSV format:</strong> One course name per line
+                </small>
             </div>
 
             <!-- Search Courses -->
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Search & Add Course</h5>
-                    <div class="input-group mb-3">
-                        <input type="text" id="searchQuery" class="form-control" placeholder="Search Golf Courses">
-                        <button class="btn btn-outline-secondary" onclick="searchCourses()">Search</button>
-                    </div>
-                    <ul class="list-group" id="searchResults"></ul>
+            <div class="card-modern">
+                <div class="card-header-custom">
+                    🔍 Search & Add Course
                 </div>
+                <div class="input-group mb-3">
+                    <input type="text" id="searchQuery" class="form-control form-control-modern" placeholder="Search for golf courses..." onkeypress="if(event.key === 'Enter') searchCourses()">
+                    <button class="btn btn-golf-secondary" onclick="searchCourses()" style="border-radius: 12px; margin-left: 10px;">Search</button>
+                </div>
+                <div id="searchResults"></div>
             </div>
         </div>
 
+    </div>
     </div>
 
     <!-- JavaScript -->
@@ -102,32 +112,53 @@
                 .then(data => {
                     const rankings = document.getElementById('rankings');
                     rankings.innerHTML = '';
+                    if (data.length === 0) {
+                        rankings.innerHTML = '<li class="list-group-item text-center text-muted">No courses yet. Add some courses to start ranking!</li>';
+                        return;
+                    }
                     data.forEach((course, index) => {
-                        rankings.innerHTML += `<li class="list-group-item">
-                            ${index + 1}. ${course.name} (${course.rating})
-                        </li>`;
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item ranking-item';
+                        li.innerHTML = `
+                            <span class="ranking-number">${index + 1}</span>
+                            <strong>${course.name}</strong>
+                            <span class="ranking-rating">${course.rating}</span>
+                        `;
+                        rankings.appendChild(li);
                     });
                 });
         }
 
 function searchCourses() {
     const query = document.getElementById('searchQuery').value;
+    if (!query.trim()) return;
+
+    const resultsDiv = document.getElementById('searchResults');
+    resultsDiv.innerHTML = '<div class="text-center text-muted">Searching...</div>';
+
     fetch(`/search_courses?query=${encodeURIComponent(query)}`)
         .then(res => res.json())
         .then(results => {
-            const ul = document.getElementById('searchResults');
-            ul.innerHTML = '';
+            resultsDiv.innerHTML = '';
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<div class="text-center text-muted">No courses found. Try a different search.</div>';
+                return;
+            }
             results.forEach(course => {
-                const li = document.createElement('li');
-                li.className = 'list-group-item d-flex justify-content-between align-items-center';
-                li.innerHTML = `<strong>${course.name}</strong><br><small>${course.address}</small>`;
-                const btn = document.createElement('button');
-                btn.className = 'btn btn-sm btn-success';
-                btn.innerText = 'Add';
-                btn.onclick = () => addCourse(course.name, course.address);
-                li.appendChild(btn);
-                ul.appendChild(li);
+                const div = document.createElement('div');
+                div.className = 'search-result-item d-flex justify-content-between align-items-center';
+                div.innerHTML = `
+                    <div>
+                        <strong style="color: var(--golf-green);">${course.name}</strong><br>
+                        <small class="text-muted">${course.address}</small>
+                    </div>
+                    <button class="btn btn-golf-primary btn-sm" onclick='addCourse("${course.name.replace(/'/g, "\\'")}","${course.address.replace(/'/g, "\\'")}")'>Add</button>
+                `;
+                resultsDiv.appendChild(div);
             });
+        })
+        .catch(error => {
+            resultsDiv.innerHTML = '<div class="text-center text-danger">Error searching. Please try again.</div>';
         });
 }
 
