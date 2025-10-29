@@ -76,6 +76,35 @@ body {
     background-image: url('/static/images/golf4.jpeg');
 }
 
+/* Photo Credit */
+.photo-credit {
+    position: fixed;
+    bottom: 15px;
+    right: 15px;
+    background: rgba(0, 0, 0, 0.5);
+    color: rgba(255, 255, 255, 0.8);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    z-index: 10;
+    backdrop-filter: blur(5px);
+    transition: opacity 0.3s ease;
+}
+
+.photo-credit:hover {
+    opacity: 0.9;
+}
+
+.photo-credit a {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+}
+
+.photo-credit a:hover {
+    color: var(--white);
+    text-decoration: underline;
+}
+
 /* Navbar Styling */
 .navbar-custom {
     background: linear-gradient(90deg, var(--golf-green-dark) 0%, var(--golf-green) 100%);
