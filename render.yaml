@@ -11,7 +11,5 @@ services:
         generateValue: true
       - key: FLASK_ENV
         value: production
-    disk:
-      name: course-data
-      mountPath: /data
-      sizeGB: 1
+    # Note: Persistent disks require paid plan ($7/month)
+    # Free tier uses ephemeral storage (data resets on restart)
