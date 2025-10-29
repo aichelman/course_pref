@@ -15,10 +15,15 @@ app = Flask(__name__)
 # Use persistent disk path in production, local path in development
 if os.environ.get('RENDER'):
     # Render persistent disk will be mounted at /data
-    db_path = '/data/courses.db'
+    db_dir = '/data'
+    # Ensure the directory exists
+    os.makedirs(db_dir, exist_ok=True)
+    db_path = os.path.join(db_dir, 'courses.db')
 else:
     # Local development uses instance folder
-    db_path = 'instance/courses.db'
+    db_dir = 'instance'
+    os.makedirs(db_dir, exist_ok=True)
+    db_path = os.path.join(db_dir, 'courses.db')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
