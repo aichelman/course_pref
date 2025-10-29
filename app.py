@@ -11,7 +11,16 @@ from werkzeug.security import generate_password_hash, check_password_hash
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///courses.db'
+
+# Use persistent disk path in production, local path in development
+if os.environ.get('RENDER'):
+    # Render persistent disk will be mounted at /data
+    db_path = '/data/courses.db'
+else:
+    # Local development uses instance folder
+    db_path = 'instance/courses.db'
+
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 db = SQLAlchemy(app)
 login_manager = LoginManager()
