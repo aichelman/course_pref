@@ -12,10 +12,15 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Ensure instance directory exists
-db_dir = 'instance'
-os.makedirs(db_dir, exist_ok=True)
-db_path = os.path.join(db_dir, 'courses.db')
+# Use /tmp for database on production (Render), instance for local dev
+if os.environ.get('RENDER') or os.environ.get('FLASK_ENV') == 'production':
+    # Render's free tier: /tmp is writable (ephemeral storage)
+    db_path = '/tmp/courses.db'
+else:
+    # Local development: use instance folder
+    db_dir = 'instance'
+    os.makedirs(db_dir, exist_ok=True)
+    db_path = os.path.join(db_dir, 'courses.db')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
