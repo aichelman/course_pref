@@ -12,17 +12,21 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Use /tmp for database on production (Render), instance for local dev
-if os.environ.get('RENDER') or os.environ.get('FLASK_ENV') == 'production':
-    # Render's free tier: /tmp is writable (ephemeral storage)
-    db_path = '/tmp/courses.db'
+# Database configuration: Use PostgreSQL if DATABASE_URL is set, otherwise SQLite
+database_url = os.environ.get('DATABASE_URL')
+
+if database_url:
+    # PostgreSQL - production with Supabase
+    # Fix for SQLAlchemy - it expects postgresql:// not postgres://
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 else:
-    # Local development: use instance folder
+    # SQLite - local development
     db_dir = 'instance'
     os.makedirs(db_dir, exist_ok=True)
     db_path = os.path.join(db_dir, 'courses.db')
-
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # Session configuration - extend session lifetime
