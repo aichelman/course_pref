@@ -2,6 +2,7 @@ import os
 import csv
 import random
 import requests
+from urllib.parse import quote_plus, urlparse, urlunparse
 from dotenv import load_dotenv
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
@@ -12,19 +13,49 @@ load_dotenv()
 
 app = Flask(__name__)
 
+def fix_database_url(url):
+    """Fix database URL to handle special characters in password"""
+    if not url:
+        return None
+
+    # Fix postgres:// to postgresql://
+    if url.startswith('postgres://'):
+        url = url.replace('postgres://', 'postgresql://', 1)
+
+    # Parse the URL to handle special characters properly
+    try:
+        # Extract components manually for better control
+        # Format: postgresql://user:password@host:port/database
+        if '@' in url and '://' in url:
+            scheme_and_auth = url.split('@')[0]
+            host_and_rest = url.split('@')[1]
+
+            scheme = scheme_and_auth.split('://')[0]
+            auth = scheme_and_auth.split('://')[1]
+
+            if ':' in auth:
+                user, password = auth.split(':', 1)
+                # URL-encode the password to handle special characters
+                encoded_password = quote_plus(password)
+                # Reconstruct the URL with encoded password
+                url = f"{scheme}://{user}:{encoded_password}@{host_and_rest}"
+    except Exception as e:
+        print(f"Warning: Could not parse database URL: {e}")
+        # Return original URL if parsing fails
+        pass
+
+    # Add SSL mode if not present
+    if '?' not in url:
+        url += '?sslmode=require'
+
+    return url
+
 # Database configuration: Use PostgreSQL if DATABASE_URL is set, otherwise SQLite
 database_url = os.environ.get('DATABASE_URL')
 
 if database_url:
     # PostgreSQL - production with Supabase
-    # Fix for SQLAlchemy - it expects postgresql:// not postgres://
-    if database_url.startswith('postgres://'):
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
-
-    # Add connection parameters for Supabase
-    if '?' not in database_url:
-        database_url += '?sslmode=require'
-
+    database_url = fix_database_url(database_url)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'pool_pre_ping': True,
