@@ -20,7 +20,20 @@ if database_url:
     # Fix for SQLAlchemy - it expects postgresql:// not postgres://
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+    # Add connection parameters for Supabase
+    if '?' not in database_url:
+        database_url += '?sslmode=require'
+
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+        'connect_args': {
+            'connect_timeout': 10,
+            'options': '-c statement_timeout=30000'
+        }
+    }
 else:
     # SQLite - local development
     db_dir = 'instance'
