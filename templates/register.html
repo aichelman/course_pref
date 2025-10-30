@@ -2,10 +2,31 @@
 <html>
 <head>
     <title>Register - Fairway Pairwise</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/style.css" rel="stylesheet">
+    <style>
+        /* Force high quality image rendering */
+        img, .slide {
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
+    </style>
 </head>
 <body>
+    <!-- Background Slideshow -->
+    <div class="background-slideshow">
+        <div class="slide slide1 active"></div>
+        <div class="slide slide2"></div>
+        <div class="slide slide3"></div>
+        <div class="slide slide4"></div>
+    </div>
+
+    <!-- Photo Credit -->
+    <div class="photo-credit">
+        Photos by Cam Lange
+    </div>
+
     <div class="auth-container">
         <div class="auth-card">
             <div class="text-center mb-4">
@@ -37,6 +58,21 @@
     </div>
 
     <script>
+        // Background slideshow cycling
+        function startSlideshow() {
+            const slides = document.querySelectorAll('.slide');
+            let currentSlide = 0;
+
+            setInterval(() => {
+                slides[currentSlide].classList.remove('active');
+                currentSlide = (currentSlide + 1) % slides.length;
+                slides[currentSlide].classList.add('active');
+            }, 60000); // Change image every 1 minute
+        }
+
+        // Start slideshow when page loads
+        startSlideshow();
+
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = document.getElementById('username').value;
