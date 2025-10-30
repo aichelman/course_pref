@@ -3,7 +3,7 @@ import csv
 import random
 import requests
 from dotenv import load_dotenv
-from flask import Flask, render_template, jsonify, request, redirect, url_for
+from flask import Flask, render_template, jsonify, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -24,6 +24,14 @@ else:
 
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# Session configuration - extend session lifetime
+app.config['PERMANENT_SESSION_LIFETIME'] = 2592000  # 30 days in seconds
+app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['REMEMBER_COOKIE_DURATION'] = 2592000  # 30 days for remember me
+
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -87,7 +95,8 @@ def login():
         user = User.query.filter_by(username=username).first()
 
         if user and user.check_password(password):
-            login_user(user)
+            session.permanent = True  # Make session last for PERMANENT_SESSION_LIFETIME
+            login_user(user, remember=True)
             return jsonify({"status": "success"})
         return jsonify({"status": "error", "message": "Invalid username or password"}), 401
 
@@ -110,7 +119,8 @@ def register():
         db.session.add(user)
         db.session.commit()
 
-        login_user(user)
+        session.permanent = True  # Make session last for PERMANENT_SESSION_LIFETIME
+        login_user(user, remember=True)
         return jsonify({"status": "success"})
 
     return render_template('register.html')
