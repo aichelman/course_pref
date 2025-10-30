@@ -208,7 +208,6 @@ body {
     border-radius: 12px;
     transition: all 0.3s ease;
     box-shadow: 0 4px 12px var(--shadow);
-    border: 2px solid transparent;
     position: relative;
     overflow: hidden;
 }
@@ -216,28 +215,30 @@ body {
 .course-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px var(--shadow-hover);
-    border-color: var(--golf-green);
 }
 
 .course-btn-1 {
     background: var(--white);
     color: var(--golf-green);
-    border-color: var(--golf-green-light);
+    border: 3px solid var(--golf-green-light);
 }
 
 .course-btn-1:hover {
     background: var(--golf-green-light);
     color: var(--white);
-}
-
-.course-btn-2 {
-    background: var(--golf-green);
-    color: var(--white);
     border-color: var(--golf-green);
 }
 
+.course-btn-2 {
+    background: var(--white);
+    color: var(--dark-gray);
+    border: 3px dashed var(--dark-gray);
+}
+
 .course-btn-2:hover {
-    background: var(--golf-green-dark);
+    background: var(--light-gray);
+    border-style: solid;
+    border-color: var(--golf-green);
 }
 
 /* Rankings List */
