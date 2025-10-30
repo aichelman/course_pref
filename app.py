@@ -35,8 +35,19 @@ def fix_database_url(url):
 
             if ':' in auth:
                 user, password = auth.split(':', 1)
-                # URL-encode the password to handle special characters
-                encoded_password = quote_plus(password)
+
+                # Check if password is already URL-encoded
+                # If it contains %XX patterns, assume it's already encoded
+                import re
+                is_already_encoded = bool(re.search(r'%[0-9A-Fa-f]{2}', password))
+
+                if not is_already_encoded:
+                    # URL-encode the password to handle special characters
+                    encoded_password = quote_plus(password)
+                else:
+                    # Already encoded, use as-is
+                    encoded_password = password
+
                 # Reconstruct the URL with encoded password
                 url = f"{scheme}://{user}:{encoded_password}@{host_and_rest}"
     except Exception as e:
