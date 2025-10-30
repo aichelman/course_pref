@@ -50,36 +50,19 @@ body {
     width: 100%;
     height: 100%;
     opacity: 0;
-    transition: opacity 2s ease-in-out;
+    transition: opacity 1s ease-in-out;
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: crisp-edges;
-    image-rendering: high-quality;
-    -webkit-backface-visibility: hidden;
-    -webkit-transform: translateZ(0) scale(1.0, 1.0);
-    transform: translateZ(0) scale(1.0, 1.0);
+    will-change: opacity;
 }
 
 .slide.active {
     opacity: 1;
 }
 
-.slide1 {
-    background-image: url('/static/images/golf1.jpeg');
-}
-
-.slide2 {
-    background-image: url('/static/images/golf2.jpeg');
-}
-
-.slide3 {
-    background-image: url('/static/images/golf3.jpeg');
-}
-
-.slide4 {
-    background-image: url('/static/images/golf4.jpeg');
+.slide.loaded {
+    /* Image loaded via JavaScript */
 }
 
 /* Photo Credit */
