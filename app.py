@@ -91,7 +91,9 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-i
 
 # Session configuration - extend session lifetime
 app.config['PERMANENT_SESSION_LIFETIME'] = 2592000  # 30 days in seconds
-app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
+# Note: SESSION_COOKIE_SECURE disabled because Render uses reverse proxy
+# The app runs on HTTP internally even though accessed via HTTPS externally
+# Setting this to True can cause session/cookie issues with reverse proxies
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['REMEMBER_COOKIE_DURATION'] = 2592000  # 30 days for remember me
@@ -159,6 +161,8 @@ def login():
         user = User.query.filter_by(username=username).first()
 
         if user and user.check_password(password):
+            # Clear any existing session data to prevent session fixation
+            session.clear()
             session.permanent = True  # Make session last for PERMANENT_SESSION_LIFETIME
             login_user(user, remember=True)
             return jsonify({"status": "success"})
@@ -183,6 +187,8 @@ def register():
         db.session.add(user)
         db.session.commit()
 
+        # Clear any existing session data to prevent session fixation
+        session.clear()
         session.permanent = True  # Make session last for PERMANENT_SESSION_LIFETIME
         login_user(user, remember=True)
         return jsonify({"status": "success"})
@@ -193,6 +199,7 @@ def register():
 @login_required
 def logout():
     logout_user()
+    session.clear()  # Clear all session data
     return redirect(url_for('login'))
 
 @app.route('/pair')
