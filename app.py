@@ -323,18 +323,31 @@ def ghin_connect():
         return jsonify({"status": "error", "message": "GHIN username and password required"}), 400
 
     try:
-        # Step 1: Authenticate with GHIN - Try multiple methods
+        # Step 1: Authenticate with GHIN
         print(f"Attempting GHIN login for user: {ghin_username}")
 
-        # Correct GHIN API endpoint and format (from georgebjork/ghin-api)
-        login_url = "https://api2.ghin.com/api/login"
+        # Correct GHIN API endpoint and format (from Stack Overflow working solution)
+        login_url = "https://api2.ghin.com/api/v1/golfer_login.json"
+
+        # Credentials must be nested under "user" object with token field
         login_data = {
-            "ghinNum": ghin_username,
-            "password": ghin_password
+            "user": {
+                "email_or_ghin": ghin_username,
+                "password": ghin_password,
+                "remember_me": "true"
+            },
+            "token": "nonblank"
         }
 
-        print(f"Trying correct GHIN API: /api/login with ghinNum field")
-        login_response = requests.post(login_url, json=login_data, timeout=15)
+        # Headers required for authentication
+        headers = {
+            "Content-Type": "application/json; charset=utf-8",
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0"
+        }
+
+        print(f"Authenticating with GHIN API...")
+        login_response = requests.post(login_url, json=login_data, headers=headers, timeout=15)
         print(f"GHIN login response status: {login_response.status_code}")
         print(f"GHIN login response body: {login_response.text[:500]}")
 
@@ -342,17 +355,17 @@ def ghin_connect():
             # Return more detailed error
             try:
                 error_data = login_response.json()
-                error_msg = error_data.get('error', {}).get('message', 'Invalid GHIN credentials')
+                error_msg = error_data.get('error', 'Invalid GHIN credentials')
                 print(f"GHIN error message: {error_msg}")
                 return jsonify({"status": "error", "message": f"GHIN authentication failed: {error_msg}"}), 401
             except:
                 return jsonify({"status": "error", "message": f"GHIN authentication failed (Status {login_response.status_code})"}), 401
 
         login_data_response = login_response.json()
-        # Correct response format: {"webToken": "..."}
-        token = login_data_response.get('webToken')
-        # Use the ghin username as the golfer_id since that's what they provided
-        golfer_id = ghin_username
+        # Correct response format: {"golfer_user": {"golfer_user_token": "..."}}
+        token = login_data_response.get('golfer_user', {}).get('golfer_user_token')
+        # Also extract golfer_id from response
+        golfer_id = login_data_response.get('golfer_user', {}).get('golfer_id') or ghin_username
 
         print(f"Token received: {'Yes' if token else 'No'}")
         print(f"Using Golfer ID: {golfer_id}")
@@ -360,22 +373,20 @@ def ghin_connect():
         if not token:
             return jsonify({"status": "error", "message": "Failed to get authentication token from GHIN"}), 500
 
-        # Step 2: Fetch golfer's score history using correct endpoint
-        scores_url = f"https://api2.ghin.com/api/{golfer_id}/recentScores"
+        # Step 2: Fetch golfer's score history using correct v1 endpoint
+        scores_url = f"https://api2.ghin.com/api/v1/golfers/{golfer_id}/scores.json"
 
-        # Try with Bearer token in header first
-        headers = {"Authorization": f"Bearer {token}"}
+        # Use Bearer token in Authorization header
+        score_headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0"
+        }
+
         print(f"Fetching scores from: {scores_url}")
-        scores_response = requests.get(scores_url, headers=headers, timeout=15)
+        scores_response = requests.get(scores_url, headers=score_headers, timeout=15)
         print(f"Scores response status: {scores_response.status_code}")
         print(f"Scores response body: {scores_response.text[:500]}")
-
-        # If failed, try with webToken as query parameter
-        if scores_response.status_code != 200:
-            print(f"Trying with webToken as query parameter")
-            scores_response = requests.get(f"{scores_url}?webToken={token}", timeout=15)
-            print(f"Scores response status (query): {scores_response.status_code}")
-            print(f"Scores response body (query): {scores_response.text[:500]}")
 
         if scores_response.status_code != 200:
             return jsonify({"status": "error", "message": f"Failed to fetch score history (Status {scores_response.status_code})"}), 500
