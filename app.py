@@ -232,19 +232,51 @@ def rankings():
 @login_required
 def search_courses():
     query = request.args.get('query')
-    url = "https://nominatim.openstreetmap.org/search"
-    params = {"q": f"{query} golf", "format": "json", "limit": 10}
-    headers = {"User-Agent": "GolfCourseRankerApp"}
-    response = requests.get(url, params=params, headers=headers).json()
 
-    results = []
-    for res in response:
-        display_name = res["display_name"]
-        name = display_name.split(",")[0]
-        address = ", ".join(display_name.split(",")[1:]).strip()
-        results.append({"name": name, "address": address})
+    # Use GolfCourseAPI for better golf-specific results
+    api_key = os.environ.get('GOLF_COURSE_API_KEY')
+    if not api_key:
+        return jsonify({"error": "Golf Course API key not configured"}), 500
 
-    return jsonify(results)
+    url = "https://api.golfcourseapi.com/v1/search"
+    params = {"search_query": query}
+    headers = {
+        "Authorization": f"Key {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        # Parse GolfCourseAPI response format
+        results = []
+        courses = data.get('courses', [])
+        for course in courses[:10]:  # Limit to 10 results
+            # Try to get name from various fields
+            name = course.get('course_name') or course.get('club_name') or course.get('name', '')
+
+            # Build address from location object
+            location = course.get('location', {})
+            address_parts = []
+            if location.get('city'):
+                address_parts.append(location.get('city'))
+            if location.get('state'):
+                address_parts.append(location.get('state'))
+            if location.get('country'):
+                address_parts.append(location.get('country'))
+
+            address = ", ".join(address_parts) if address_parts else "Location not available"
+
+            if name:  # Only add if we have a name
+                results.append({"name": name, "address": address})
+
+        return jsonify(results)
+
+    except requests.exceptions.RequestException as e:
+        print(f"Golf Course API error: {e}")
+        return jsonify({"error": "Failed to search golf courses"}), 500
 
 @app.route('/add_course', methods=['POST'])
 @login_required
