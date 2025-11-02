@@ -330,14 +330,27 @@ def ghin_connect():
             "password": ghin_password
         }
 
+        print(f"Attempting GHIN login for user: {ghin_username}")
         login_response = requests.post(login_url, json=login_data, timeout=15)
+        print(f"GHIN login response status: {login_response.status_code}")
+        print(f"GHIN login response body: {login_response.text[:500]}")
 
         if login_response.status_code != 200:
-            return jsonify({"status": "error", "message": "Invalid GHIN credentials"}), 401
+            # Return more detailed error
+            try:
+                error_data = login_response.json()
+                error_msg = error_data.get('error', {}).get('message', 'Invalid GHIN credentials')
+                print(f"GHIN error message: {error_msg}")
+                return jsonify({"status": "error", "message": f"GHIN authentication failed: {error_msg}"}), 401
+            except:
+                return jsonify({"status": "error", "message": f"GHIN authentication failed (Status {login_response.status_code})"}), 401
 
         login_data_response = login_response.json()
         token = login_data_response.get('golfer_user', {}).get('golfer_user_token')
         golfer_id = login_data_response.get('golfer_user', {}).get('golfer_id')
+
+        print(f"Token received: {'Yes' if token else 'No'}")
+        print(f"Golfer ID: {golfer_id}")
 
         if not token or not golfer_id:
             return jsonify({"status": "error", "message": "Failed to authenticate with GHIN"}), 500
