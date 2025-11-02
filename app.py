@@ -480,6 +480,44 @@ def ghin_connect():
         print(f"Unexpected error: {e}")
         return jsonify({"status": "error", "message": "An unexpected error occurred"}), 500
 
+@app.route('/add_courses_bulk', methods=['POST'])
+@login_required
+def add_courses_bulk():
+    """Add multiple courses from frontend (used by GHIN integration)"""
+    courses = request.json.get('courses', [])
+
+    if not courses:
+        return jsonify({"status": "error", "message": "No courses provided"}), 400
+
+    added_count = 0
+    already_exists_count = 0
+
+    for course_name in courses:
+        # Check if user already has this course
+        existing_course = Course.query.filter_by(name=course_name, user_id=current_user.id).first()
+        if existing_course:
+            already_exists_count += 1
+            continue
+
+        # Add new course
+        new_course = Course(name=course_name, user_id=current_user.id)
+        db.session.add(new_course)
+        db.session.commit()
+
+        # Create rating entry
+        rating = Rating(user_id=current_user.id, course_id=new_course.id, rating=1200)
+        db.session.add(rating)
+        added_count += 1
+
+    db.session.commit()
+
+    return jsonify({
+        "status": "success",
+        "total_found": len(courses),
+        "added": added_count,
+        "already_exists": already_exists_count
+    })
+
 @app.route('/upload_csv', methods=['POST'])
 @login_required
 def upload_csv():

@@ -294,7 +294,7 @@ function toggleGHIN() {
     }
 }
 
-function connectGHIN() {
+async function connectGHIN() {
     const username = document.getElementById('ghinUsername').value;
     const password = document.getElementById('ghinPassword').value;
     const monthsBack = parseInt(document.getElementById('monthsBack').value);
@@ -307,36 +307,116 @@ function connectGHIN() {
 
     statusDiv.innerHTML = '<div class="text-center text-muted">Connecting to GHIN and fetching courses...</div>';
 
-    fetch('/ghin_connect', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            ghin_username: username,
-            ghin_password: password,
-            months_back: monthsBack
-        })
-    }).then(res => res.json())
-      .then(data => {
-          if (data.status === 'success') {
-              statusDiv.innerHTML = `<div class="alert alert-success-modern alert-modern">
-                  <strong>Success!</strong><br>
-                  Found ${data.total_found} courses in your history<br>
-                  Added ${data.added} new courses<br>
-                  ${data.already_exists} courses already in your list
-              </div>`;
-              // Clear the form
-              document.getElementById('ghinUsername').value = '';
-              document.getElementById('ghinPassword').value = '';
-              // Refresh rankings and pair
-              loadRankings();
-              loadPair();
-          } else {
-              statusDiv.innerHTML = `<div class="alert alert-danger-modern alert-modern">${data.message}</div>`;
-          }
-      })
-      .catch(error => {
-          statusDiv.innerHTML = '<div class="alert alert-danger-modern alert-modern">Error connecting to GHIN. Please try again.</div>';
-      });
+    try {
+        // Step 1: Get Firebase session token
+        const firebaseResponse = await fetch('https://firebaseinstallations.googleapis.com/v1/projects/ghin-mobile-app/installations', {
+            method: 'POST',
+            headers: {
+                'x-goog-api-key': 'AIzaSyBxgTOAWxiud0HuaE5tN-5NTlzFnrtyz-I',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                appId: '1:884417644529:web:47fb315bc6c70242f72650',
+                authVersion: 'FIS_v2',
+                fid: 'fg6JfS0U01YmrelthLX9Iz',
+                sdkVersion: 'w:0.5.7'
+            })
+        });
+
+        if (!firebaseResponse.ok) {
+            throw new Error('Failed to get Firebase session token');
+        }
+
+        const firebaseData = await firebaseResponse.json();
+        const sessionToken = firebaseData.authToken.token;
+
+        // Step 2: Login to GHIN with session token
+        const loginResponse = await fetch('https://api2.ghin.com/api/v1/golfer_login.json', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0'
+            },
+            body: JSON.stringify({
+                user: {
+                    email_or_ghin: username,
+                    password: password,
+                    remember_me: 'true'
+                },
+                token: sessionToken
+            })
+        });
+
+        if (!loginResponse.ok) {
+            throw new Error('Invalid GHIN credentials');
+        }
+
+        const loginData = await loginResponse.json();
+        const accessToken = loginData.golfer_user.golfer_user_token;
+        const golferId = loginData.golfer_user.golfer_id || username;
+
+        // Step 3: Fetch scores
+        const scoresResponse = await fetch(`https://api2.ghin.com/api/v1/golfers/${golferId}/scores.json`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!scoresResponse.ok) {
+            throw new Error('Failed to fetch score history');
+        }
+
+        const scoresData = await scoresResponse.json();
+
+        // Step 4: Extract unique course names from date range
+        const cutoffDate = new Date();
+        cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack);
+
+        const coursesFound = new Set();
+        scoresData.scores.forEach(score => {
+            if (score.played_at) {
+                const scoreDate = new Date(score.played_at);
+                if (scoreDate >= cutoffDate) {
+                    const courseName = score.course_name || score.club_name;
+                    if (courseName) {
+                        coursesFound.add(courseName);
+                    }
+                }
+            }
+        });
+
+        // Step 5: Send course names to backend to add them
+        const addResponse = await fetch('/add_courses_bulk', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                courses: Array.from(coursesFound)
+            })
+        });
+
+        const addData = await addResponse.json();
+
+        if (addData.status === 'success') {
+            statusDiv.innerHTML = `<div class="alert alert-success-modern alert-modern">
+                <strong>Success!</strong><br>
+                Found ${addData.total_found} courses in your history<br>
+                Added ${addData.added} new courses<br>
+                ${addData.already_exists} courses already in your list
+            </div>`;
+            // Clear the form
+            document.getElementById('ghinUsername').value = '';
+            document.getElementById('ghinPassword').value = '';
+            // Refresh rankings and pair
+            loadRankings();
+            loadPair();
+        } else {
+            statusDiv.innerHTML = `<div class="alert alert-danger-modern alert-modern">${addData.message}</div>`;
+        }
+    } catch (error) {
+        statusDiv.innerHTML = `<div class="alert alert-danger-modern alert-modern">Error: ${error.message}</div>`;
+    }
 }
 
 function uploadCSV() {
