@@ -369,23 +369,44 @@ async function connectGHIN() {
         }
 
         const scoresData = await scoresResponse.json();
+        console.log('GHIN Scores Response:', scoresData);
 
         // Step 4: Extract unique course names from date range
         const cutoffDate = new Date();
         cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack);
+        console.log('Cutoff date:', cutoffDate);
 
         const coursesFound = new Set();
-        scoresData.scores.forEach(score => {
+
+        // GHIN API has multiple score arrays - combine them all
+        const allScores = [
+            ...(scoresData.revision_scores?.scores || []),
+            ...(scoresData.recent_scores?.scores || [])
+        ];
+
+        console.log('Processing', allScores.length, 'total scores');
+
+        allScores.forEach((score, index) => {
+            if (index < 3) console.log('Sample score', index, ':', score); // Log first 3 scores
+
             if (score.played_at) {
                 const scoreDate = new Date(score.played_at);
+
                 if (scoreDate >= cutoffDate) {
-                    const courseName = score.course_name || score.club_name;
+                    // GHIN uses facility_name for the course
+                    const courseName = score.facility_name || score.course_name || score.club_name;
                     if (courseName) {
+                        console.log('Found course:', courseName);
                         coursesFound.add(courseName);
+                    } else {
+                        console.log('Score has no facility_name:', score);
                     }
                 }
             }
         });
+
+        console.log('Total unique courses found:', coursesFound.size);
+        console.log('Course names:', Array.from(coursesFound));
 
         // Step 5: Send course names to backend to add them
         const addResponse = await fetch('/add_courses_bulk', {
