@@ -323,31 +323,61 @@ def ghin_connect():
         return jsonify({"status": "error", "message": "GHIN username and password required"}), 400
 
     try:
-        # Step 1: Authenticate with GHIN
+        # Step 1: Get Firebase session token (required for GHIN authentication)
         print(f"Attempting GHIN login for user: {ghin_username}")
+        print(f"Step 1: Getting Firebase session token...")
 
-        # Correct GHIN API endpoint and format (from Stack Overflow working solution)
+        # Firebase Installations API constants (from n8io/ghin npm package)
+        firebase_url = "https://firebaseinstallations.googleapis.com/v1/projects/ghin-mobile-app/installations"
+        firebase_headers = {
+            "x-goog-api-key": "AIzaSyBxgTOAWxiud0HuaE5tN-5NTlzFnrtyz-I",
+            "Content-Type": "application/json"
+        }
+        firebase_data = {
+            "appId": "1:884417644529:web:47fb315bc6c70242f72650",
+            "authVersion": "FIS_v2",
+            "fid": "fg6JfS0U01YmrelthLX9Iz",
+            "sdkVersion": "w:0.5.7"
+        }
+
+        firebase_response = requests.post(firebase_url, json=firebase_data, headers=firebase_headers, timeout=15)
+        print(f"Firebase response status: {firebase_response.status_code}")
+        print(f"Firebase response body: {firebase_response.text[:500]}")
+
+        if firebase_response.status_code != 200:
+            return jsonify({"status": "error", "message": f"Failed to get Firebase session token (Status {firebase_response.status_code})"}), 500
+
+        firebase_result = firebase_response.json()
+        session_token = firebase_result.get('authToken', {}).get('token')
+
+        if not session_token:
+            return jsonify({"status": "error", "message": "Failed to extract session token from Firebase"}), 500
+
+        print(f"Firebase session token obtained: {session_token[:20]}...")
+
+        # Step 2: Authenticate with GHIN using session token
+        print(f"Step 2: Authenticating with GHIN...")
+
         login_url = "https://api2.ghin.com/api/v1/golfer_login.json"
 
-        # Credentials must be nested under "user" object with token field
+        # Credentials must include session token
         login_data = {
             "user": {
                 "email_or_ghin": ghin_username,
                 "password": ghin_password,
                 "remember_me": "true"
             },
-            "token": "nonblank"
+            "token": session_token
         }
 
         # Headers required for authentication
-        headers = {
+        login_headers = {
             "Content-Type": "application/json; charset=utf-8",
             "Accept": "application/json",
-            "User-Agent": "Mozilla/5.0"
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
         }
 
-        print(f"Authenticating with GHIN API...")
-        login_response = requests.post(login_url, json=login_data, headers=headers, timeout=15)
+        login_response = requests.post(login_url, json=login_data, headers=login_headers, timeout=15)
         print(f"GHIN login response status: {login_response.status_code}")
         print(f"GHIN login response body: {login_response.text[:500]}")
 
