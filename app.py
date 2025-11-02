@@ -326,35 +326,33 @@ def ghin_connect():
         # Step 1: Authenticate with GHIN - Try multiple methods
         print(f"Attempting GHIN login for user: {ghin_username}")
 
-        # Method 1: Try as JSON with email_or_ghin
+        # Method 1: Try as JSON with email_or_ghin and remember_me
         login_url = "https://api2.ghin.com/api/v1/golfer_login.json"
         login_data = {
             "email_or_ghin": ghin_username,
-            "password": ghin_password
+            "password": ghin_password,
+            "remember_me": "true"
         }
 
-        print(f"Method 1: Trying JSON with email_or_ghin")
+        print(f"Method 1: Trying JSON with email_or_ghin and remember_me")
         login_response = requests.post(login_url, json=login_data, timeout=15)
         print(f"GHIN login response status: {login_response.status_code}")
         print(f"GHIN login response body: {login_response.text[:500]}")
 
-        # Method 2: If failed, try form data instead of JSON
+        # Method 2: If failed, try alternative user/login endpoint
         if login_response.status_code != 200:
-            print(f"Method 2: Trying form data")
+            print(f"Method 2: Trying alternative /user/login endpoint")
+            alt_login_url = "https://api2.ghin.com/api/v1/user/login.json"
+            login_response = requests.post(alt_login_url, json=login_data, timeout=15)
+            print(f"GHIN login response status (alt): {login_response.status_code}")
+            print(f"GHIN login response body (alt): {login_response.text[:500]}")
+
+        # Method 3: If failed, try form data instead of JSON
+        if login_response.status_code != 200:
+            print(f"Method 3: Trying form data")
             login_response = requests.post(login_url, data=login_data, timeout=15)
             print(f"GHIN login response status (form): {login_response.status_code}")
             print(f"GHIN login response body (form): {login_response.text[:500]}")
-
-        # Method 3: If still failed, try with 'email' and 'ghin_number' separately
-        if login_response.status_code != 200:
-            print(f"Method 3: Trying with email field")
-            login_data_alt = {
-                "email": ghin_username,
-                "password": ghin_password
-            }
-            login_response = requests.post(login_url, json=login_data_alt, timeout=15)
-            print(f"GHIN login response status (email): {login_response.status_code}")
-            print(f"GHIN login response body (email): {login_response.text[:500]}")
 
         if login_response.status_code != 200:
             # Return more detailed error
