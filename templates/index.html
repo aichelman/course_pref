@@ -71,9 +71,11 @@
                     Search & Add Course
                 </div>
                 <div class="input-group mb-3">
-                    <input type="text" id="searchQuery" class="form-control form-control-modern" placeholder="Search for golf courses..." onkeypress="if(event.key === 'Enter') searchCourses()">
+                    <div style="position: relative; flex: 1;">
+                        <input type="text" id="searchQuery" class="form-control form-control-modern" placeholder="Search for golf courses..." onkeypress="if(event.key === 'Enter') searchCourses()" style="padding-right: 40px;">
+                        <button onclick="clearSearch()" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; color: #6c757d; font-size: 1.2rem; cursor: pointer; padding: 0 5px;" title="Clear search">✕</button>
+                    </div>
                     <button class="btn btn-golf-secondary" onclick="searchCourses()" style="border-radius: 12px; margin-left: 10px;">Search</button>
-                    <button class="btn btn-outline-secondary" onclick="clearSearch()" style="border-radius: 12px; margin-left: 10px;" title="Clear search">✕</button>
                 </div>
                 <div id="searchResults"></div>
             </div>
