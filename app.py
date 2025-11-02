@@ -311,6 +311,104 @@ def add_course():
 
     return jsonify({"status": "added", "course": course_name})
 
+@app.route('/ghin_connect', methods=['POST'])
+@login_required
+def ghin_connect():
+    """Connect to GHIN and import courses from score history"""
+    ghin_username = request.json.get('ghin_username')
+    ghin_password = request.json.get('ghin_password')
+    months_back = request.json.get('months_back', 12)  # Default to 12 months
+
+    if not ghin_username or not ghin_password:
+        return jsonify({"status": "error", "message": "GHIN username and password required"}), 400
+
+    try:
+        # Step 1: Authenticate with GHIN
+        login_url = "https://api2.ghin.com/api/v1/golfer_login.json"
+        login_data = {
+            "email_or_ghin": ghin_username,
+            "password": ghin_password
+        }
+
+        login_response = requests.post(login_url, json=login_data, timeout=15)
+
+        if login_response.status_code != 200:
+            return jsonify({"status": "error", "message": "Invalid GHIN credentials"}), 401
+
+        login_data_response = login_response.json()
+        token = login_data_response.get('golfer_user', {}).get('golfer_user_token')
+        golfer_id = login_data_response.get('golfer_user', {}).get('golfer_id')
+
+        if not token or not golfer_id:
+            return jsonify({"status": "error", "message": "Failed to authenticate with GHIN"}), 500
+
+        # Step 2: Fetch golfer's score history
+        scores_url = f"https://api2.ghin.com/api/v1/golfers/{golfer_id}/scores.json"
+        headers = {"Authorization": f"Bearer {token}"}
+
+        scores_response = requests.get(scores_url, headers=headers, timeout=15)
+
+        if scores_response.status_code != 200:
+            return jsonify({"status": "error", "message": "Failed to fetch score history"}), 500
+
+        scores_data = scores_response.json()
+
+        # Step 3: Extract unique course names from score history
+        courses_found = set()
+        from datetime import datetime, timedelta
+
+        cutoff_date = datetime.now() - timedelta(days=months_back * 30)
+
+        for score in scores_data.get('scores', []):
+            # Check if score is within date range
+            played_at = score.get('played_at')
+            if played_at:
+                score_date = datetime.strptime(played_at[:10], '%Y-%m-%d')
+                if score_date < cutoff_date:
+                    continue
+
+            # Get course name
+            course_name = score.get('course_name') or score.get('club_name')
+            if course_name:
+                courses_found.add(course_name)
+
+        # Step 4: Add new courses to user's list (deduplicate)
+        added_count = 0
+        already_exists_count = 0
+
+        for course_name in courses_found:
+            # Check if user already has this course
+            existing_course = Course.query.filter_by(name=course_name, user_id=current_user.id).first()
+            if existing_course:
+                already_exists_count += 1
+                continue
+
+            # Add new course
+            new_course = Course(name=course_name, user_id=current_user.id)
+            db.session.add(new_course)
+            db.session.commit()
+
+            # Create rating entry
+            rating = Rating(user_id=current_user.id, course_id=new_course.id, rating=1200)
+            db.session.add(rating)
+            added_count += 1
+
+        db.session.commit()
+
+        return jsonify({
+            "status": "success",
+            "total_found": len(courses_found),
+            "added": added_count,
+            "already_exists": already_exists_count
+        })
+
+    except requests.exceptions.RequestException as e:
+        print(f"GHIN API error: {e}")
+        return jsonify({"status": "error", "message": "Failed to connect to GHIN"}), 500
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return jsonify({"status": "error", "message": "An unexpected error occurred"}), 500
+
 @app.route('/upload_csv', methods=['POST'])
 @login_required
 def upload_csv():
