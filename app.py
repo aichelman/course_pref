@@ -326,33 +326,17 @@ def ghin_connect():
         # Step 1: Authenticate with GHIN - Try multiple methods
         print(f"Attempting GHIN login for user: {ghin_username}")
 
-        # Method 1: Try as JSON with email_or_ghin and remember_me
-        login_url = "https://api2.ghin.com/api/v1/golfer_login.json"
+        # Correct GHIN API endpoint and format (from georgebjork/ghin-api)
+        login_url = "https://api2.ghin.com/api/login"
         login_data = {
-            "email_or_ghin": ghin_username,
-            "password": ghin_password,
-            "remember_me": "true"
+            "ghinNum": ghin_username,
+            "password": ghin_password
         }
 
-        print(f"Method 1: Trying JSON with email_or_ghin and remember_me")
+        print(f"Trying correct GHIN API: /api/login with ghinNum field")
         login_response = requests.post(login_url, json=login_data, timeout=15)
         print(f"GHIN login response status: {login_response.status_code}")
         print(f"GHIN login response body: {login_response.text[:500]}")
-
-        # Method 2: If failed, try alternative user/login endpoint
-        if login_response.status_code != 200:
-            print(f"Method 2: Trying alternative /user/login endpoint")
-            alt_login_url = "https://api2.ghin.com/api/v1/user/login.json"
-            login_response = requests.post(alt_login_url, json=login_data, timeout=15)
-            print(f"GHIN login response status (alt): {login_response.status_code}")
-            print(f"GHIN login response body (alt): {login_response.text[:500]}")
-
-        # Method 3: If failed, try form data instead of JSON
-        if login_response.status_code != 200:
-            print(f"Method 3: Trying form data")
-            login_response = requests.post(login_url, data=login_data, timeout=15)
-            print(f"GHIN login response status (form): {login_response.status_code}")
-            print(f"GHIN login response body (form): {login_response.text[:500]}")
 
         if login_response.status_code != 200:
             # Return more detailed error
@@ -365,25 +349,39 @@ def ghin_connect():
                 return jsonify({"status": "error", "message": f"GHIN authentication failed (Status {login_response.status_code})"}), 401
 
         login_data_response = login_response.json()
-        token = login_data_response.get('golfer_user', {}).get('golfer_user_token')
-        golfer_id = login_data_response.get('golfer_user', {}).get('golfer_id')
+        # Correct response format: {"webToken": "..."}
+        token = login_data_response.get('webToken')
+        # Use the ghin username as the golfer_id since that's what they provided
+        golfer_id = ghin_username
 
         print(f"Token received: {'Yes' if token else 'No'}")
-        print(f"Golfer ID: {golfer_id}")
+        print(f"Using Golfer ID: {golfer_id}")
 
-        if not token or not golfer_id:
-            return jsonify({"status": "error", "message": "Failed to authenticate with GHIN"}), 500
+        if not token:
+            return jsonify({"status": "error", "message": "Failed to get authentication token from GHIN"}), 500
 
-        # Step 2: Fetch golfer's score history
-        scores_url = f"https://api2.ghin.com/api/v1/golfers/{golfer_id}/scores.json"
+        # Step 2: Fetch golfer's score history using correct endpoint
+        scores_url = f"https://api2.ghin.com/api/{golfer_id}/recentScores"
+
+        # Try with Bearer token in header first
         headers = {"Authorization": f"Bearer {token}"}
-
+        print(f"Fetching scores from: {scores_url}")
         scores_response = requests.get(scores_url, headers=headers, timeout=15)
+        print(f"Scores response status: {scores_response.status_code}")
+        print(f"Scores response body: {scores_response.text[:500]}")
+
+        # If failed, try with webToken as query parameter
+        if scores_response.status_code != 200:
+            print(f"Trying with webToken as query parameter")
+            scores_response = requests.get(f"{scores_url}?webToken={token}", timeout=15)
+            print(f"Scores response status (query): {scores_response.status_code}")
+            print(f"Scores response body (query): {scores_response.text[:500]}")
 
         if scores_response.status_code != 200:
-            return jsonify({"status": "error", "message": "Failed to fetch score history"}), 500
+            return jsonify({"status": "error", "message": f"Failed to fetch score history (Status {scores_response.status_code})"}), 500
 
         scores_data = scores_response.json()
+        print(f"Scores data structure: {list(scores_data.keys()) if isinstance(scores_data, dict) else type(scores_data)}")
 
         # Step 3: Extract unique course names from score history
         courses_found = set()
