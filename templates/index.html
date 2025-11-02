@@ -104,6 +104,7 @@
                 <div class="input-group mb-3">
                     <input type="text" id="searchQuery" class="form-control form-control-modern" placeholder="Search for golf courses..." onkeypress="if(event.key === 'Enter') searchCourses()">
                     <button class="btn btn-golf-secondary" onclick="searchCourses()" style="border-radius: 12px; margin-left: 10px;">Search</button>
+                    <button class="btn btn-outline-secondary" onclick="clearSearch()" style="border-radius: 12px; margin-left: 10px;" title="Clear search">✕</button>
                 </div>
                 <div id="searchResults"></div>
             </div>
@@ -253,10 +254,16 @@ function addCourse(name, address) {
               alert(`${name} added!`);
               loadRankings();
               loadPair();
+              clearSearch(); // Clear search after adding course
           } else {
               alert(`${name} already exists in your list!`);
           }
       });
+}
+
+function clearSearch() {
+    document.getElementById('searchQuery').value = '';
+    document.getElementById('searchResults').innerHTML = '';
 }
 
 function connectGHIN() {
