@@ -254,8 +254,19 @@ def search_courses():
         results = []
         courses = data.get('courses', [])
         for course in courses[:10]:  # Limit to 10 results
-            # Try to get name from various fields
-            name = course.get('course_name') or course.get('club_name') or course.get('name', '')
+            # Combine course_name and club_name for full descriptive name
+            course_name = course.get('course_name', '')
+            club_name = course.get('club_name', '')
+
+            # Build full name: "Jones Course at Rock Barn"
+            if course_name and club_name and course_name != club_name:
+                name = f"{course_name} at {club_name}"
+            elif course_name:
+                name = course_name
+            elif club_name:
+                name = club_name
+            else:
+                name = ''
 
             # Build address from location object
             location = course.get('location', {})
