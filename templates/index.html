@@ -111,9 +111,23 @@
                             <option value="120">120 months (10 years)</option>
                         </select>
                     </div>
-                    <button class="btn btn-golf-primary w-100 mb-3" onclick="connectGHIN()">Import from GHIN</button>
+                    <button class="btn btn-golf-primary w-100 mb-3" onclick="connectGHIN()">Fetch Courses from GHIN</button>
                     <button class="btn btn-outline-secondary w-100 mb-3" onclick="toggleGHIN()">Cancel</button>
                     <div id="ghinStatus" class="mt-3"></div>
+
+                    <!-- Course Selection UI (hidden until courses are fetched) -->
+                    <div id="ghinCourseSelector" style="display: none;" class="mt-4">
+                        <h5 class="mb-3" style="color: var(--golf-green); font-weight: 700;">Select Courses to Import</h5>
+                        <p class="text-muted small mb-3">Uncheck any courses you don't want to add</p>
+                        <div id="ghinCourseList" class="mb-3" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 10px;">
+                            <!-- Courses will be populated here -->
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-golf-primary flex-fill" onclick="confirmGHINImport()">Import Selected Courses</button>
+                            <button class="btn btn-outline-secondary flex-fill" onclick="cancelGHINImport()">Cancel</button>
+                        </div>
+                    </div>
+
                     <small class="text-muted d-block mt-3">
                         <strong>Note:</strong> Your GHIN credentials are only used once to fetch courses and are not stored.
                     </small>
@@ -291,6 +305,7 @@ function toggleGHIN() {
         document.getElementById('ghinUsername').value = '';
         document.getElementById('ghinPassword').value = '';
         document.getElementById('ghinStatus').innerHTML = '';
+        document.getElementById('ghinCourseSelector').style.display = 'none';
     }
 }
 
@@ -408,36 +423,87 @@ async function connectGHIN() {
         console.log('Total unique courses found:', coursesFound.size);
         console.log('Course names:', Array.from(coursesFound));
 
-        // Step 5: Send course names to backend to add them
-        const addResponse = await fetch('/add_courses_bulk', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                courses: Array.from(coursesFound)
-            })
-        });
+        // Step 5: Show course selector for user confirmation
+        if (coursesFound.size === 0) {
+            statusDiv.innerHTML = '<div class="alert alert-danger-modern alert-modern">No courses found in the selected time period. Try expanding the date range.</div>';
+            return;
+        }
 
-        const addData = await addResponse.json();
+        // Populate course selector
+        const courseList = document.getElementById('ghinCourseList');
+        const coursesArray = Array.from(coursesFound).sort();
 
-        if (addData.status === 'success') {
+        courseList.innerHTML = coursesArray.map((course, index) => `
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" value="${course}" id="ghinCourse${index}" checked>
+                <label class="form-check-label" for="ghinCourse${index}">
+                    ${course}
+                </label>
+            </div>
+        `).join('');
+
+        // Show the selector and hide status
+        statusDiv.innerHTML = `<div class="alert alert-success-modern alert-modern">
+            Found ${coursesFound.size} courses in your GHIN history
+        </div>`;
+        document.getElementById('ghinCourseSelector').style.display = 'block';
+
+    } catch (error) {
+        statusDiv.innerHTML = `<div class="alert alert-danger-modern alert-modern">Error: ${error.message}</div>`;
+    }
+}
+
+function confirmGHINImport() {
+    const statusDiv = document.getElementById('ghinStatus');
+    statusDiv.innerHTML = '<div class="text-center text-muted">Importing selected courses...</div>';
+
+    // Get all checked courses
+    const checkboxes = document.querySelectorAll('#ghinCourseList input[type="checkbox"]:checked');
+    const selectedCourses = Array.from(checkboxes).map(cb => cb.value);
+
+    if (selectedCourses.length === 0) {
+        statusDiv.innerHTML = '<div class="alert alert-danger-modern alert-modern">Please select at least one course to import</div>';
+        return;
+    }
+
+    // Send selected courses to backend
+    fetch('/add_courses_bulk', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            courses: selectedCourses
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
             statusDiv.innerHTML = `<div class="alert alert-success-modern alert-modern">
                 <strong>Success!</strong><br>
-                Found ${addData.total_found} courses in your history<br>
-                Added ${addData.added} new courses<br>
-                ${addData.already_exists} courses already in your list
+                Added ${data.added} new courses<br>
+                ${data.already_exists} courses already in your list
             </div>`;
-            // Clear the form
+
+            // Hide selector and clear form
+            document.getElementById('ghinCourseSelector').style.display = 'none';
             document.getElementById('ghinUsername').value = '';
             document.getElementById('ghinPassword').value = '';
+
             // Refresh rankings and pair
             loadRankings();
             loadPair();
         } else {
-            statusDiv.innerHTML = `<div class="alert alert-danger-modern alert-modern">${addData.message}</div>`;
+            statusDiv.innerHTML = `<div class="alert alert-danger-modern alert-modern">${data.message}</div>`;
         }
-    } catch (error) {
-        statusDiv.innerHTML = `<div class="alert alert-danger-modern alert-modern">Error: ${error.message}</div>`;
-    }
+    })
+    .catch(error => {
+        statusDiv.innerHTML = `<div class="alert alert-danger-modern alert-modern">Error importing courses</div>`;
+    });
+}
+
+function cancelGHINImport() {
+    // Hide selector and clear status
+    document.getElementById('ghinCourseSelector').style.display = 'none';
+    document.getElementById('ghinStatus').innerHTML = '';
 }
 
 function uploadCSV() {
